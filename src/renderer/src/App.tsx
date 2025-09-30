@@ -1,58 +1,94 @@
-import { useEffect, useState } from "react";
-import Editor from "./components/EditorView";
+import { useState } from 'react';
+import SongViewer from "./components/SongViewer";
+import EditorView from "./components/EditorViewer";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import LibraryMenu from "./components/LibraryMenu";
+import TopBar from "./components/TopBar";
+import { useSelectedSongs } from "./stores/songs";
+import useUi from './stores/ui';
+
+type ViewMode = 'view' | 'edit';
 
 function App() {
+  const selectedSong = useSelectedSongs((state) => state.selectedSong);
+  const viewMode = useUi((state) => state.viewMode);
+  const setViewMode = useUi((state) => state.setViewMode);
+  const queryClient = useQueryClient();
 
-  const [songs, setSongs] = useState<any[]>([]);
-  const [raw, setRaw] = useState<any>();
+  // Lista de músicas
+  const { data: songs } = useQuery({
+    queryKey: ["songs"],
+    queryFn: window.library.getSongs
+  });
 
-  useEffect(() => {
-    (async () => {
-      const songs = await window.library.getSongs();
-      setSongs(songs);
-    })();
-  }, []);
+  // Música selecionada (para visualização)
+  const { data: song } = useQuery({
+    queryKey: ["song", selectedSong],
+    queryFn: () => window.song.open(selectedSong!),
+    enabled: !!selectedSong,
+  });
 
-  const handleAddSong = async () => {
-    const song = await window.library.pickAndAddSong();
-    if (song) {
-      const songs = await window.library.getSongs();
-      setSongs(songs);
-      console.log("Nova música:", song);
-      console.log("Biblioteca atualizada:", songs);
+  // Raw content (para edição)
+  const { data: editData } = useQuery({
+    queryKey: ["song-edit", selectedSong],
+    queryFn: () => window.song.edit(selectedSong!),
+    enabled: !!selectedSong && viewMode === 'edit',
+  });
+
+  // Handler para salvar
+  const handleSave = async (newContent: string) => {
+    if (!selectedSong) return;
+
+    const result = await window.song.save(selectedSong, newContent);
+
+    if (result.success) {
+      // Invalida cache para forçar reload
+      queryClient.invalidateQueries({ queryKey: ["song", selectedSong] });
+      queryClient.invalidateQueries({ queryKey: ["song-edit", selectedSong] });
+
+      // Volta para modo visualização
+      // setViewMode('view');
+    } else {
+      throw new Error(result.error || 'Failed to save');
     }
   };
 
-  const handleEdit = async (id: string) => {
-    const song = await window.song.edit(id);
-    setRaw(song);
-    console.log("Música editada:", song);
+  // Handler para fechar editor
+  const handleCloseEditor = () => {
+    setViewMode('view');
+    // Limpa cache de edição
+    queryClient.removeQueries({ queryKey: ["song-edit", selectedSong] });
   };
 
-  const handleEditSong = (content: string) => {
-    console.log("Conteúdo editado:", content);
-    setRaw(state => { return { ...state, rawContent: content } });
-  }
-
   return (
-    <>
-      <button onClick={handleAddSong}>
-        Importar
-      </button>
+    <div className="flex flex-col h-screen overflow-hidden">
+      <TopBar />
 
-      {raw &&
-        <Editor content={raw?.rawContent || ""} onChange={handleEditSong} />}
+      <div className="flex flex-1 overflow-hidden">
+        <LibraryMenu />
 
-      <div>
-        {songs.map((song) => (
-          <div key={song.id} onClick={() => handleEdit(song.id)}>
-            <p>{song.title}</p>
-            <p>{song.artist}</p>
-          </div>
-        ))}
+        <div className=" flex flex-1 overflow-hidden">
+          {!selectedSong ? (
+            // Nenhuma música selecionada
+            <div className="flex items-center justify-center h-full text-gray-400">
+              Select a song to view or edit
+            </div>
+          ) : <>{
+            editData?.rawContent && viewMode === 'edit' && (
+              <EditorView
+                songId={selectedSong}
+                initialContent={editData.rawContent}
+                onSave={handleSave}
+                onClose={handleCloseEditor}
+              />
+            )}
+            <SongViewer song={song?.ast} />
+          </>
+          }
+        </div>
       </div>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default App;
