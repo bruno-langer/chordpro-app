@@ -35,9 +35,18 @@ export default function LibraryMenu() {
         className={`transition-all duration-300 text-white p-0 border-r-2 border-gray-200
         ${menuOpen ? "w-64" : " w-0 overflow-hidden display-none"}`}
       >
+        <div className="mb-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Filter by name..."
+            className="text-black bg-white p-2 my-2 rounded-md border-2 border-gray-200"
+          />
+          <PlusIcon className="h-6 w-6 cursor-pointer text-gray-600 hover:text-gray-800 hover:scale-95 transition-all " onClick={handleImportNewSong} />
+        </div>
         <ul>
-          <button onClick={handleImportNewSong}>Importar</button>
-          {menuOpen && songs?.map((song) => (
+          {menuOpen && songs?.filter(song => song.title.toLowerCase().includes(search.toLowerCase())).map((song) => (
             <li key={song.id} className={"mb-2 text-gray-800" + (song.id === selectedSong ? " bg-gray-100" : "")}>
               <button
                 onClick={() => {

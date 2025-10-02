@@ -68,7 +68,7 @@ export default function TopBar() {
     console.log(selectedSongs)
     return (
         <div className="flex items-center h-12 text-white p-4 border-b-2 border-gray-200">
-            <FolderIcon className="h-6 w-6 cursor-pointer text-gray-600 hover:text-gray-800 hover:scale-95 transition-all " onClick={setMenuOpen} />
+            <FolderIcon className="h-6 w-6 cursor-pointer text-gray-600 hover:text-gray-800 hover:scale-95 transition-all mr-4 " onClick={setMenuOpen} />
 
             {
                 viewMode === 'view' &&
